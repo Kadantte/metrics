@@ -1,9 +1,9 @@
 //Setup
-export default async function({login, data, queries, imports, q, account}, {enabled = false} = {}) {
+export default async function({login, data, queries, imports, q, account}, {enabled = false, extras = false} = {}) {
   //Plugin execution
   try {
     //Check if plugin is enabled and requirements are met
-    if ((!enabled) || (!q.anilist))
+    if ((!q.anilist) || (!imports.metadata.plugins.anilist.enabled(enabled, {extras})))
       return null
 
     //Load inputs
@@ -68,13 +68,14 @@ export default async function({login, data, queries, imports, q, account}, {enab
             const {data: {data: {User: {favourites: {[type]: {nodes, pageInfo: cursor}}}}}} = await imports.axios.post("https://graphql.anilist.co", {variables: {name: user, page}, query: queries.anilist.favorites({type})})
             page++
             next = cursor.hasNextPage
-            list.push(...await Promise.all(nodes.map(media => format({media: {progess: null, score: null, media}, imports}))))
+            list.push(...await Promise.all(nodes.map(media => format({media: {progress: null, score: null, media}, imports}))))
           }
           catch (error) {
             if (await retry({login, imports, error}))
               continue
           }
-        } while (next)
+        }
+        while (next)
         //Format and save results
         result.lists[type].favorites = shuffle ? imports.shuffle(list) : list
         //Limit results
@@ -107,7 +108,8 @@ export default async function({login, data, queries, imports, q, account}, {enab
           if (await retry({login, imports, error}))
             continue
         }
-      } while (next)
+      }
+      while (next)
       //Format and save results
       result.characters = shuffle ? imports.shuffle(characters) : characters
       //Limit results
@@ -122,14 +124,7 @@ export default async function({login, data, queries, imports, q, account}, {enab
   }
   //Handle errors
   catch (error) {
-    let message = "An error occured"
-    if (error.isAxiosError) {
-      const status = error.response?.status
-      console.debug(error.response.data)
-      message = `API returned ${status}`
-      error = error.response?.data ?? null
-    }
-    throw {error: {message, instance: error}}
+    throw imports.format.error(error)
   }
 }
 

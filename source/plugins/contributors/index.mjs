@@ -3,7 +3,7 @@ export default async function({login, q, imports, data, rest, graphql, queries, 
   //Plugin execution
   try {
     //Check if plugin is enabled and requirements are met
-    if ((!enabled) || (!q.contributors))
+    if ((!q.contributors) || (!imports.metadata.plugins.contributors.enabled(enabled, {extras})))
       return null
 
     //Load inputs
@@ -51,7 +51,7 @@ export default async function({login, q, imports, data, rest, graphql, queries, 
     //Compute contributors and contributions
     let contributors = {}
     for (const {author: {login, avatar_url: avatar}, commit: {message = "", author: {email = ""} = {}}} of commits) {
-      if ((!login) || (ignored.includes(login)) || (ignored.includes(email))) {
+      if ((!login) || (!imports.filters.text(login, ignored)) || (!imports.filters.text(email, ignored))) {
         console.debug(`metrics/compute/${login}/plugins > contributors > ignored contributor "${login}"`)
         continue
       }
@@ -70,7 +70,7 @@ export default async function({login, q, imports, data, rest, graphql, queries, 
 
     //Contributions categories
     const types = Object.fromEntries([...new Set(Object.keys(categories))].map(type => [type, new Set()]))
-    if ((sections.includes("categories")) && (extras)) {
+    if ((sections.includes("categories")) && (imports.metadata.plugins.contributors.extras("categories", {extras}))) {
       //Temporary directory
       const repository = `${repo.owner}/${repo.repo}`
       const path = imports.paths.join(imports.os.tmpdir(), `${repository.replace(/[^\w]/g, "_")}`)
@@ -109,7 +109,7 @@ export default async function({login, q, imports, data, rest, graphql, queries, 
       }
       catch (error) {
         console.debug(error)
-        console.debug(`metrics/compute/${login}/plugins > contributors > an error occured while processing ${repository}`)
+        console.debug(`metrics/compute/${login}/plugins > contributors > an error occurred while processing ${repository}`)
       }
       finally {
         //Cleaning
@@ -123,6 +123,6 @@ export default async function({login, q, imports, data, rest, graphql, queries, 
   }
   //Handle errors
   catch (error) {
-    throw {error: {message: "An error occured", instance: error}}
+    throw imports.format.error(error)
   }
 }

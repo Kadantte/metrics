@@ -38,7 +38,7 @@
     <td rowspan="2"><p>Base content</p>
 <p>The following sections are supported:</p>
 <ul>
-<li><code>header</code>, which usually contains username, two-week commits calendars and a few additional data</li>
+<li><code>header</code>, which usually contains username, two-weeks commits calendars and a few additional data</li>
 <li><code>activity</code>, which contains recent activity (commits, pull requests, issues, etc.)</li>
 <li><code>community</code>, which contains community stats (following, sponsors, organizations, etc.)</li>
 <li><code>repositories</code>, which contains repository stats (license, forks, stars, etc.)</li>
@@ -69,14 +69,31 @@ This currently improves the accuracy of the following statistics:</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
-    <td nowrap="nowrap">🌐 Web instances must configure <code>settings.json</code><br>
+    <td nowrap="nowrap">🌐 Web instances must configure <code>settings.json</code>:
+<ul>
+<li><i>metrics.api.github.overuse</i></li>
+</ul>
 <b>type:</b> <code>boolean</code>
 <br>
 <b>default:</b> no<br></td>
   </tr>
   <tr>
     <td nowrap="nowrap"><h4><code>base_hireable</code></h4></td>
-    <td rowspan="2"><p>Display <code>Available for hire!</code> in header section</p>
+    <td rowspan="2"><p>Show <code>Available for hire!</code> in header section</p>
+<img width="900" height="1" alt=""></td>
+  </tr>
+  <tr>
+    <td nowrap="nowrap"><b>type:</b> <code>boolean</code>
+<br>
+<b>default:</b> no<br></td>
+  </tr>
+  <tr>
+    <td nowrap="nowrap"><h4><code>base_skip</code></h4></td>
+    <td rowspan="2"><p>Skip base content</p>
+<blockquote>
+<p>⚠️ Any plugin that relies on base content data may break!
+Only use this option when using a plugin that can be configured with <a href="/source/plugins/core/README.md#token"><code>token: NOT_NEEDED</code></a></p>
+</blockquote>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -86,7 +103,7 @@ This currently improves the accuracy of the following statistics:</p>
   </tr>
   <tr>
     <td nowrap="nowrap"><h4><code>repositories</code></h4></td>
-    <td rowspan="2"><p>Repositories to fetch</p>
+    <td rowspan="2"><p>Fetched repositories</p>
 <p>A higher value result in more accurate metrics but can hit GitHub API rate-limit more easily (especially with a lot of plugins enabled)</p>
 <img width="900" height="1" alt=""></td>
   </tr>
@@ -99,9 +116,9 @@ This currently improves the accuracy of the following statistics:</p>
   </tr>
   <tr>
     <td nowrap="nowrap"><h4><code>repositories_batch</code></h4></td>
-    <td rowspan="2"><p>Repositories to fetch at a time</p>
-<p>If you receive <code>Something went wrong while executing your query</code> (which is usually caused by API timeout),
-try lowering this value.</p>
+    <td rowspan="2"><p>Fetched repositories per query</p>
+<p>If you receive <code>Something went wrong while executing your query</code> (which is usually caused by API timeouts), lowering this value may help.
+This setting may not be supported by all plugins.</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -131,8 +148,8 @@ try lowering this value.</p>
 <li><code>organization_member</code>: repositories from an organization where user is a member</li>
 </ul>
 <p>Some plugin outputs may be affected by this setting too.</p>
-<p>Set to <code>&quot;&quot;</code> to disable and fetch all repositories related to you.
-Broad affiliation will result in less representative metrics.</p>
+<p>Set to <code>&quot;&quot;</code> to disable and fetch all repositories related to given account.
+Broad affiliations will result in less representative metrics.</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -150,13 +167,13 @@ Broad affiliation will result in less representative metrics.</p>
   <tr>
     <td nowrap="nowrap">⏭️ Global option<br>
 <b>type:</b> <code>array</code>
-<i>(comma-separated)</i>
+<i>(newline-separated)</i>
 <br></td>
   </tr>
   <tr>
     <td nowrap="nowrap"><h4><code>users_ignored</code></h4></td>
     <td rowspan="2"><p>Default ignored users</p>
-<p>Note that email are supported only commits-related elements.</p>
+<p>Note that emails are only supported in commits-related elements.</p>
 <img width="900" height="1" alt=""></td>
   </tr>
   <tr>
@@ -176,7 +193,7 @@ Broad affiliation will result in less representative metrics.</p>
     <td nowrap="nowrap">⏭️ Global option<br>
 ⏯️ Cannot be preset<br>
 <b>type:</b> <code>array</code>
-<i>(comma-seperated)</i>
+<i>(comma-separated)</i>
 <br>
 <b>default:</b> <code>→ User login</code><br></td>
   </tr>

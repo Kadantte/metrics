@@ -1,9 +1,9 @@
 //Setup
-export default async function({login, imports, data, q, account}, {enabled = false, token = ""} = {}) {
+export default async function({login, imports, data, q, account}, {enabled = false, token = "", extras = false} = {}) {
   //Plugin execution
   try {
     //Check if plugin is enabled and requirements are met
-    if ((!enabled) || (!q.tweets))
+    if ((!q.tweets) || (!imports.metadata.plugins.tweets.enabled(enabled, {extras})))
       return null
 
     //Load inputs
@@ -50,16 +50,21 @@ export default async function({login, imports, data, q, account}, {enabled = fal
         if (tweet.attachments)
           tweet.attachments = await Promise.all(tweet.attachments.media_keys.filter(key => medias.get(key)).map(key => medias.get(key)).map(async url => ({image: await imports.imgb64(url, {height: -1, width: 450})})))
         if (linked) {
-          const {result: {ogImage, ogSiteName: website, ogTitle: title, ogDescription: description}} = await imports.opengraph({url: linked})
-          const image = await imports.imgb64(ogImage?.url, {height: -1, width: 450, fallback: false})
-          if (image) {
-            if (tweet.attachments)
-              tweet.attachments.unshift([{image, title, description, website}])
-            else
-              tweet.attachments = [{image, title, description, website}]
+          try {
+            const {result: {ogImage, ogSiteName: website, ogTitle: title, ogDescription: description}} = await imports.opengraph({url: linked})
+            const image = await imports.imgb64(ogImage?.url, {height: -1, width: 450, fallback: false})
+            if (image) {
+              if (tweet.attachments)
+                tweet.attachments.unshift([{image, title, description, website}])
+              else
+                tweet.attachments = [{image, title, description, website}]
+            }
+            else {
+              tweet.text = `${tweet.text}\n${linked}`
+            }
           }
-          else {
-            tweet.text = `${tweet.text}\n${linked}`
+          catch (error) {
+            console.debug(`metrics/compute/${login}/plugins > tweets > error while retrieving linked content: ${error.message}`)
           }
         }
       }
@@ -93,13 +98,6 @@ export default async function({login, imports, data, q, account}, {enabled = fal
   }
   //Handle errors
   catch (error) {
-    let message = "An error occured"
-    if (error.isAxiosError) {
-      const status = error.response?.status
-      const description = error.response?.data?.errors?.[0]?.message ?? null
-      message = `API returned ${status}${description ? ` (${description})` : ""}`
-      error = error.response?.data ?? null
-    }
-    throw {error: {message, instance: error}}
+    throw imports.format.error(error)
   }
 }

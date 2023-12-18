@@ -1,9 +1,9 @@
 //Setup
-export default async function({login, q, imports, graphql, queries, data, account}, {enabled = false} = {}) {
+export default async function({login, q, imports, graphql, queries, data, account}, {enabled = false, extras = false} = {}) {
   //Plugin execution
   try {
     //Check if plugin is enabled and requirements are met
-    if ((!enabled) || (!q.discussions))
+    if ((!q.discussions) || (!imports.metadata.plugins.discussions.enabled(enabled, {extras})))
       return null
 
     //Load inputs
@@ -28,7 +28,8 @@ export default async function({login, q, imports, graphql, queries, data, accoun
         fetched.push(...nodes)
         pushed = nodes.length
         console.debug(`metrics/compute/${login}/discussions > retrieved ${pushed} discussions after ${cursor}`)
-      } while ((pushed) && (cursor))
+      }
+      while ((pushed) && (cursor))
 
       //Compute upvotes
       fetched.map(({upvoteCount}) => discussions.upvotes.discussions += upvoteCount)
@@ -53,7 +54,8 @@ export default async function({login, q, imports, graphql, queries, data, accoun
         fetched.push(...nodes)
         pushed = nodes.length
         console.debug(`metrics/compute/${login}/discussions > retrieved ${pushed} comments after ${cursor}`)
-      } while ((pushed) && (cursor))
+      }
+      while ((pushed) && (cursor))
 
       //Compute upvotes
       fetched.map(({upvoteCount}) => discussions.upvotes.comments += upvoteCount)
@@ -64,6 +66,6 @@ export default async function({login, q, imports, graphql, queries, data, accoun
   }
   //Handle errors
   catch (error) {
-    throw {error: {message: "An error occured", instance: error}}
+    throw imports.format.error(error)
   }
 }

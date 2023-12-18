@@ -96,7 +96,7 @@ function quit(reason) {
     }
 
     //Load configuration
-    const {conf, Plugins, Templates} = await setup({log: false, community: {templates: core.getInput("setup_community_templates")}})
+    const {conf, Plugins, Templates} = await setup({log: false, community: {templates: core.getInput("setup_community_templates")}, extras: true})
     const {metadata} = conf
     conf.settings.extras = {default: true}
     info("Setup", "complete")
@@ -146,6 +146,8 @@ function quit(reason) {
       "quota.required.search": _quota_required_search,
       "notice.release": _notice_releases,
       "clean.workflows": _clean_workflows,
+      "github.api.rest": _github_api_rest,
+      "github.api.graphql": _github_api_graphql,
       ...config
     } = metadata.plugins.core.inputs.action({core, preset})
     const q = {...query, ...(_repo ? {repo: _repo} : null), template}
@@ -169,18 +171,22 @@ function quit(reason) {
     info("GitHub token", token, {token: true})
     //A GitHub token should start with "gh" along an additional letter for type
     //See https://github.blog/2021-04-05-behind-githubs-new-authentication-token-formats
-    info("GitHub token format", /^gh[pousr]_/.test(token) ? "correct" : "(old or invalid)")
+    info("GitHub token format", /^github_pat_/.test(token) ? "fine-grained" : /^gh[pousr]_/.test(token) ? "classic" : "legacy or invalid")
     if (!token)
       throw new Error("You must provide a valid GitHub personal token to gather your metrics (see https://github.com/lowlighter/metrics/blob/master/.github/readme/partials/documentation/setup/action.md for more informations)")
+    if (/^github_pat_/.test(token))
+      throw new Error("It seems you're trying to use a fine-grained personal access token. These are currently unsupported as GitHub does not support them (yet?) for GraphQL API authentication (see https://docs.github.com/fr/graphql/guides/forming-calls-with-graphql#authenticating-with-graphql for more informations). Use a classic token instead.")
     conf.settings.token = token
     const api = {}
     const resources = {}
-    api.graphql = octokit.graphql.defaults({headers: {authorization: `token ${token}`}})
-    info("Github GraphQL API", "ok")
-    const octoraw = github.getOctokit(token)
+    api.graphql = octokit.graphql.defaults({headers: {authorization: `token ${token}`}, baseUrl: _github_api_graphql || undefined})
+    info("GitHub GraphQL API", "ok")
+    info("GitHub GraphQL API endpoint", api.graphql.baseUrl)
+    const octoraw = github.getOctokit(token, {baseUrl: _github_api_rest || undefined})
     api.rest = octoraw.rest
     api.rest.request = octoraw.request
-    info("Github REST API", "ok")
+    info("GitHub REST API", "ok")
+    info("GitHub REST API endpoint", api.rest.baseUrl)
     //Apply mocking if needed
     if (mocked) {
       Object.assign(api, await mocks(api))
@@ -314,6 +320,9 @@ function quit(reason) {
         console.debug(error)
       }
       info("Previous render sha", committer.sha ?? "(none)")
+      //Compatibility check
+      if ((_action === "gist") && (["png", "jpeg", "markdown-pdf"].includes(_output)))
+        throw new Error(`"config_output: ${_output}" is not supported with "config_action: ${_action}"`)
     }
     else if (dryrun) {
       info("Dry-run", true)
@@ -394,18 +403,29 @@ function quit(reason) {
     //Render metrics
     info.break()
     info.section("Rendering")
-    let rendered = await retry(async () => {
-      const {rendered, errors} = await metrics({login: user, q}, {graphql, rest, plugins, conf, die, verify, convert}, {Plugins, Templates})
+    let {rendered, mime} = await retry(async () => {
+      const {rendered, mime, errors} = await metrics({login: user, q}, {graphql, rest, plugins, conf, die, verify, convert}, {Plugins, Templates})
       if (errors.length) {
-        console.warn(`::group::${errors.length} error(s) occured`)
+        console.warn(`::group::${errors.length} error(s) occurred`)
         console.warn(util.inspect(errors, {depth: Infinity, maxStringLength: 256}))
         console.warn("::endgroup::")
       }
-      return rendered
+      return {rendered, mime}
     }, {retries, delay: retries_delay})
     if (!rendered)
       throw new Error("Could not render metrics")
     info("Status", "complete")
+    info("MIME type", mime)
+    const buffer = {
+      _content: null,
+      get content() {
+        return this._content
+      },
+      set content(value) {
+        this._content = Buffer.isBuffer(value) ? value : Buffer.from(typeof value === "object" ? JSON.stringify(value) : `${value}`)
+      },
+    }
+    buffer.content = rendered
 
     //Debug print
     if (dprint) {
@@ -417,27 +437,32 @@ function quit(reason) {
     //Output condition
     info.break()
     info.section("Saving")
-    info("Output condition", _output_condition)
-    if ((_output_condition === "data-changed") && ((committer.commit) || (committer.pr))) {
-      const {svg} = await import("../metrics/utils.mjs")
-      let data = ""
-      await retry(async () => {
-        try {
-          data = `${Buffer.from((await committer.rest.repos.getContent({...github.context.repo, ref: `heads/${committer.head}`, path: filename})).data.content, "base64")}`
-        }
-        catch (error) {
-          if (error.response.status !== 404)
-            throw error
-        }
-      }, {retries: retries_output_action, delay: retries_delay_output_action})
-      const previous = await svg.hash(data)
-      info("Previous hash", previous)
-      const current = await svg.hash(rendered)
-      info("Current hash", current)
-      const changed = (previous !== current)
-      info("Content changed", changed)
-      if (!changed)
-        committer.commit = false
+    if (_output === "svg") {
+      info("Output condition", _output_condition)
+      if ((_output_condition === "data-changed") && ((committer.commit) || (committer.pr))) {
+        const {svg} = await import("../metrics/utils.mjs")
+        let data = ""
+        await retry(async () => {
+          try {
+            data = `${Buffer.from((await committer.rest.repos.getContent({...github.context.repo, ref: `heads/${committer.head}`, path: filename})).data.content, "base64")}`
+          }
+          catch (error) {
+            if (error.response.status !== 404)
+              throw error
+          }
+        }, {retries: retries_output_action, delay: retries_delay_output_action})
+        const previous = await svg.hash(data)
+        info("Previous hash", previous)
+        const current = await svg.hash(rendered)
+        info("Current hash", current)
+        const changed = previous !== current
+        info("Content changed", changed)
+        if (!changed)
+          committer.commit = false
+      }
+    }
+    else {
+      info("Output condition", `Not applicable for ${_output}`)
     }
 
     //Save output to renders output folder
@@ -445,7 +470,7 @@ function quit(reason) {
       info("Actions to perform", "(none)")
     else {
       await fs.mkdir(paths.dirname(paths.join("/renders", filename)), {recursive: true})
-      await fs.writeFile(paths.join("/renders", filename), Buffer.from(typeof rendered === "object" ? JSON.stringify(rendered) : `${rendered}`))
+      await fs.writeFile(paths.join("/renders", filename), buffer.content)
       info(`Save to /metrics_renders/${filename}`, "ok")
       info("Output action", _action)
     }
@@ -459,7 +484,7 @@ function quit(reason) {
     else {
       //Cache embed svg for markdown outputs
       if (/markdown/.test(convert)) {
-        const regex = /(?<match><img class="metrics-cachable" data-name="(?<name>[\s\S]+?)" src="data:image[/](?<format>(?:svg[+]xml)|jpeg|png);base64,(?<content>[/+=\w]+?)">)/
+        const regex = /(?<match><img class="metrics-cacheable" data-name="(?<name>[\s\S]+?)" src="data:image[/](?<format>(?:svg[+]xml)|jpeg|png);base64,(?<content>[/+=\w]+?)">)/
         let matched = null
         while (matched = regex.exec(rendered)?.groups) { //eslint-disable-line no-cond-assign
           await retry(async () => {
@@ -497,9 +522,12 @@ function quit(reason) {
             }
           }, {retries: retries_output_action, delay: retries_delay_output_action})
         }
+        buffer.content = rendered
+        await fs.writeFile(paths.join("/renders", filename), buffer.content)
+        info(`Update /metrics_renders/${filename}`, "ok")
       }
 
-      //Check editions
+      //Check changes
       if ((committer.commit) || (committer.pr)) {
         const git = sgit()
         const sha = await git.hashObject(paths.join("/renders", filename))
@@ -513,7 +541,7 @@ function quit(reason) {
       //Upload to gist (this is done as user since committer_token may not have gist rights)
       if (committer.gist) {
         await retry(async () => {
-          await rest.gists.update({gist_id: committer.gist, files: {[filename]: {content: rendered}}})
+          await rest.gists.update({gist_id: committer.gist, files: {[filename]: {content: buffer.content.toString()}}})
           info(`Upload to gist ${committer.gist}`, "ok")
           committer.commit = false
         }, {retries: retries_output_action, delay: retries_delay_output_action})
@@ -526,7 +554,7 @@ function quit(reason) {
             ...github.context.repo,
             path: filename,
             message: committer.message,
-            content: Buffer.from(typeof rendered === "object" ? JSON.stringify(rendered) : `${rendered}`).toString("base64"),
+            content: buffer.content.toString("base64"),
             branch: committer.pr ? committer.head : committer.branch,
             ...(committer.sha ? {sha: committer.sha} : {}),
           })
@@ -604,7 +632,8 @@ function quit(reason) {
               info(`Branch ${committer.head}`, "(deleted)")
             }, {retries: retries_output_action, delay: retries_delay_output_action})
             break
-          } while (--attempts)
+          }
+          while (--attempts)
         }
       }
 
@@ -690,7 +719,7 @@ function quit(reason) {
     console.error(error)
     //Print debug buffer if debug was not enabled (if it is, it's already logged on the fly)
     if (!DEBUG) {
-      for (const log of [info.break(), "An error occured, logging debug message :", ...debugged])
+      for (const log of [info.break(), "An error occurred, logging debug message :", ...debugged])
         console.log(log)
     }
     core.setFailed(error.message)

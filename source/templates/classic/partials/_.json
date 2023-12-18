@@ -3,6 +3,7 @@
   "introduction",
   "base.activity+community",
   "base.repositories",
+  "lines",
   "followup",
   "discussions",
   "languages",
@@ -31,11 +32,18 @@
   "skyline",
   "support",
   "stackoverflow",
+  "leetcode",
+  "crypto",
   "stock",
   "achievements",
   "screenshot",
   "code",
+  "chess",
   "sponsors",
+  "sponsorships",
   "poopmap",
-  "fortune"
+  "16personalities",
+  "fortune",
+  "splatoon",
+  "steam"
 ]

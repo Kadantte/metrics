@@ -1,9 +1,9 @@
 //Setup
-export default async function({q, data, imports, account}, {enabled = false} = {}) {
+export default async function({q, data, imports, account}, {enabled = false, extras = false} = {}) {
   //Plugin execution
   try {
     //Check if plugin is enabled and requirements are met
-    if ((!enabled) || (!q.fortune))
+    if ((!q.fortune) || (!imports.metadata.plugins.fortune.enabled(enabled, {extras})))
       return null
 
     //Load inputs
@@ -40,6 +40,6 @@ export default async function({q, data, imports, account}, {enabled = false} = {
   }
   //Handle errors
   catch (error) {
-    throw {error: {message: "An error occured", instance: error}}
+    throw imports.format.error(error)
   }
 }

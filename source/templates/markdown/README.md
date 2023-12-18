@@ -32,7 +32,7 @@ Since the resulting output is a markdown file, it is possible to do additional f
 The templating engine is [EJS](https://github.com/mde/ejs) and can be used to interpolate any data retrieved by metrics.
 
 * `<%=` and `%>` are used to display escaped output
-  * `{{` and `}}` is also supported as syntaxic sugar
+  * `{{` and `}}` is also supported as syntactic sugar
 * `<%-` and `%>` are used to display raw output
 * `<%` and `%>` are used to execute JavaScript, and can also contains control statements such as conditionals and loops
 
@@ -168,11 +168,6 @@ with:
   plugin_rss: yes
   plugin_rss_source: https://news.ycombinator.com/rss
   plugin_rss_limit: 4
-  plugin_tweets: yes
-  plugin_tweets_token: ${{ secrets.TWITTER_TOKEN }}
-  plugin_tweets_user: github
-  plugin_tweets_attachments: yes
-  plugin_tweets_limit: 2
   plugin_topics: yes
   plugin_topics_limit: 24
   plugin_isocalendar: yes

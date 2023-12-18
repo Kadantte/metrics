@@ -22,12 +22,13 @@ From the `Developer settings` of your account settings, select `Personal access 
 
 No scopes are required, but additional one may be required depending on which features will be used. Each plugin documentation enumerates which scopes are required to make it work.
 
-A a general rule, the following scopes may be required:
+As a general rule, the following scopes may be required:
 - `public_repo` for some plugins
 - `read:org` for all organizations related metrics
 - `repo` for all private repositories related metrics
   - `read:user` for some private repositories related metrics
 - `read:packages` for some packages related metrics
+- `read:project` for some projects related metrics
 - `gist` for publishing renders to gists instead of a repository
 
 > 💡 For security reasons, it is advised to always use the least amount of scopes. It is possible to prevent security issues by [forking this repository](https://github.com/lowlighter/metrics/fork) and using it in your workflow instead (more information available in step 3)
@@ -67,6 +68,8 @@ on:
 jobs:
   github-metrics:
     runs-on: ubuntu-latest
+    environment: 
+      name: production
     permissions:
       contents: write
     steps:
@@ -126,7 +129,14 @@ Update profile `README.md` to include rendered image (filename may differ if `fi
 
 *Example: add rendered image with html for more customization*
 ```html
-<img align="center" src="/github-metrics.svg" alt="Metrics" width="400">
+<p align="center"><img src="/github-metrics.svg" alt="Metrics" width="400"></p>
+```
+
+*Example: add rendered image and prevent GitHub from auto linking to the image*
+```html
+<picture>
+  <img src="/github-metrics.svg" alt="Metrics">
+</picture>
 ```
 
 *Example: add rendered image when using `config_display: columns`*

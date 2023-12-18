@@ -8,7 +8,7 @@ const axios = require("axios")
 const faker = require("@faker-js/faker").faker
 const ejs = require("ejs")
 
-//Github action
+//GitHub action
 const action = yaml.load(fs.readFileSync(path.join(__dirname, "../action.yml"), "utf8"))
 action.defaults = Object.fromEntries(Object.entries(action.inputs).map(([key, {default: value}]) => [key, value]))
 action.input = vars => Object.fromEntries([...Object.entries(action.defaults), ...Object.entries(vars)].map(([key, value]) => [`INPUT_${key.toLocaleUpperCase()}`, value]))
@@ -29,7 +29,7 @@ action.run = async vars =>
 
 //Web instance
 const web = {}
-web.run = async vars => (await axios(`http://localhost:3000/lowlighter?${new url.URLSearchParams(Object.fromEntries(Object.entries(vars).map(([key, value]) => [key.replace(/^plugin_/, "").replace(/_/g, "."), value])))}`)).status === 200
+web.run = async vars => (await axios.get(`http://localhost:3000/lowlighter?${new url.URLSearchParams(Object.fromEntries(Object.entries(vars).map(([key, value]) => [key.replace(/^plugin_/, "").replace(/_/g, "."), value])))}`)).status === 200
 web.start = async () =>
   new Promise(solve => {
     let stdout = ""
@@ -40,7 +40,7 @@ web.start = async () =>
 web.stop = async () => await web.instance.kill("SIGKILL")
 
 //Web instance placeholder
-require("./../source/app/web/statics/app.placeholder.js")
+require("./../source/app/web/statics/embed/app.placeholder.js")
 const placeholder = globalThis.placeholder
 delete globalThis.placeholder
 placeholder.init({
@@ -48,7 +48,7 @@ placeholder.init({
   ejs,
   axios: {
     async get(url) {
-      return axios(`http://localhost:3000${url}`)
+      return axios.get(`http://localhost:3000${url}`)
     },
   },
 })
@@ -119,7 +119,7 @@ describe("GitHub Action", () =>
       if ((skip.includes(template)) || ((modes.length) && (!modes.includes("action"))))
         test.skip(name, () => null)
       else
-        test(name, async () => expect(await action.run({template, base: "", query: JSON.stringify(query), plugins_errors_fatal: true, dryrun: true, use_mocked_data: true, verify: true, ...input})).toBe(true), timeout)
+        test(name, async () => expect(await action.run({template, base: "", query: JSON.stringify(query), plugins_errors_fatal: true, dryrun: true, use_mocked_data: true, verify: true, retries: 1, ...input})).toBe(true), timeout)
     }
   }))
 

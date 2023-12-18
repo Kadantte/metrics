@@ -7,15 +7,14 @@
 export default async function({login, graphql, rest, data, q, queries, imports, callbacks}, conf) {
   //Load inputs
   console.debug(`metrics/compute/${login}/base > started`)
-  let {indepth, hireable, "repositories.forks": _forks, "repositories.affiliations": _affiliations, "repositories.batch": _batch} = imports.metadata.plugins.base.inputs({data, q, account: "bypass"})
-  const extras = conf.settings.extras?.features ?? conf.settings.extras?.default
+  let {indepth, hireable, skip, "repositories.forks": _forks, "repositories.affiliations": _affiliations, "repositories.batch": _batch} = imports.metadata.plugins.base.inputs({data, q, account: "bypass"})
   const repositories = conf.settings.repositories || 100
   const forks = _forks ? "" : ", isFork: false"
   const affiliations = _affiliations?.length ? `, ownerAffiliations: [${_affiliations.map(x => x.toLocaleUpperCase()).join(", ")}]${conf.authenticated === login ? `, affiliations: [${_affiliations.map(x => x.toLocaleUpperCase()).join(", ")}]` : ""}` : ""
   console.debug(`metrics/compute/${login}/base > affiliations constraints ${affiliations}`)
 
   //Skip initial data gathering if not needed
-  if (conf.settings.notoken) {
+  if ((conf.settings.notoken) || (skip)) {
     await callbacks?.plugin?.(login, "base", true, data).catch(error => console.debug(`metrics/compute/${login}/plugins/callbacks > base > ${error}`))
     return (postprocess.skip({login, data, imports}), {})
   }
@@ -90,7 +89,7 @@ export default async function({login, graphql, rest, data, q, queries, imports, 
       }
       //Query contributions collection over account lifetime instead of last year
       if (account === "user") {
-        if ((indepth) && (extras)) {
+        if ((indepth) && (imports.metadata.plugins.base.extras("indepth", {...conf.settings, error: false}))) {
           const fields = ["totalRepositoriesWithContributedCommits", "totalCommitContributions", "restrictedContributionsCount", "totalIssueContributions", "totalPullRequestContributions", "totalPullRequestReviewContributions"]
           const start = new Date(data.user.createdAt)
           const end = new Date()
@@ -174,7 +173,8 @@ export default async function({login, graphql, rest, data, q, queries, imports, 
             console.debug(`metrics/compute/${login}/base > retrieved less repositories than expected, probably no more to fetch`)
             break
           }
-        } while ((pushed) && (cursor) && ((data.user.repositories?.nodes?.length ?? 0) + (data.user.repositoriesContributedTo?.nodes?.length ?? 0) < repositories))
+        }
+        while ((pushed) && (cursor) && ((data.user.repositories?.nodes?.length ?? 0) + (data.user.repositoriesContributedTo?.nodes?.length ?? 0) < repositories))
         //Limit repositories
         console.debug(`metrics/compute/${login}/base > keeping only ${repositories} ${type}`)
         data.user[type].nodes.splice(repositories)

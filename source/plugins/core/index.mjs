@@ -53,14 +53,18 @@ export default async function({login, q}, {conf, data, rest, graphql, plugins, q
   data.animated = animations
   console.debug(`metrics/compute/${login} > animations ${data.animated ? "enabled" : "disabled"}`)
 
+  //Extras features
+  const extras = conf.settings?.extras?.features ?? conf.settings?.extras?.default ?? false
+  console.debug(`metrics/compute/${login} > extras > ${JSON.stringify(extras)}`)
+
   //Plugins
   for (const name of Object.keys(imports.plugins)) {
-    if ((!plugins[name]?.enabled) || (!q[name]))
+    if (!q[name])
       continue
     pending.push((async () => {
       try {
         console.debug(`metrics/compute/${login}/plugins > ${name} > started`)
-        data.plugins[name] = await imports.plugins[name]({login, q, imports, data, computed, rest, graphql, queries, account}, {extras: conf.settings?.extras?.features ?? conf.settings?.extras?.default ?? false, sandbox: conf.settings?.sandbox ?? false, ...plugins[name]})
+        data.plugins[name] = await imports.plugins[name]({login, q, imports, data, computed, rest, graphql, queries, account}, {extras, sandbox: conf.settings?.sandbox ?? false, ...plugins[name]})
         console.debug(`metrics/compute/${login}/plugins > ${name} > completed`)
       }
       catch (error) {
@@ -121,7 +125,7 @@ export default async function({login, q}, {conf, data, rest, graphql, plugins, q
 
   //Token scopes
   try {
-    computed.token.scopes = conf.settings.notoken ? [] : (await rest.request("HEAD /")).headers["x-oauth-scopes"].split(", ")
+    computed.token.scopes = conf.settings.notoken ? [] : (await rest.request("HEAD /")).headers["x-oauth-scopes"]?.split(", ") ?? []
   }
   catch (error) {
     console.debug(error)
@@ -140,25 +144,32 @@ export default async function({login, q}, {conf, data, rest, graphql, plugins, q
     console.debug(`metrics/compute/${login} > applying dflag --cakeday`)
     computed.cakeday = true
   }
-  if (dflags.includes("--halloween")) {
+  if ((dflags.includes("--halloween")) || (dflags.includes("--winter"))) {
+    const color = dflags.find(color => ["--halloween", "--winter"].includes(color)).replace("--", "")
     console.debug(`metrics/compute/${login} > applying dflag --halloween`)
-    //Haloween color replacer
-    const halloween = content =>
+    //Color replacer
+    const replace = content =>
       content
-        .replace(/--color-calendar-graph/g, "--color-calendar-halloween-graph")
-        .replace(/#9be9a8/gi, "var(--color-calendar-halloween-graph-day-L1-bg)")
-        .replace(/#40c463/gi, "var(--color-calendar-halloween-graph-day-L2-bg)")
-        .replace(/#30a14e/gi, "var(--color-calendar-halloween-graph-day-L3-bg)")
-        .replace(/#216e39/gi, "var(--color-calendar-halloween-graph-day-L4-bg)")
+        .replace(/--color-calendar-graph/g, `--color-calendar-${color}-graph`)
+        .replace(/#9be9a8/gi, `var(--color-calendar-${color}-graph-day-L1-bg)`)
+        .replace(/#40c463/gi, `var(--color-calendar-${color}-graph-day-L2-bg)`)
+        .replace(/#30a14e/gi, `var(--color-calendar-${color}-graph-day-L3-bg)`)
+        .replace(/#216e39/gi, `var(--color-calendar-${color}-graph-day-L4-bg)`)
     //Update contribution calendar colors
-    computed.calendar.map(day => day.color = halloween(day.color))
-    //Update isocalendar colors
+    computed.calendar.map(day => day.color = replace(day.color))
+    //Update calendars colors
     const waiting = [...pending]
     pending.push((async () => {
       await Promise.all(waiting)
       if (data.plugins.isocalendar?.svg)
-        data.plugins.isocalendar.svg = halloween(data.plugins.isocalendar.svg)
-      return {name: "dflag.halloween", result: true}
+        data.plugins.isocalendar.svg = replace(data.plugins.isocalendar.svg)
+      if (data.plugins.calendar?.years) {
+        for (const {weeks} of data.plugins.calendar.years) {
+          for (const {contributionDays} of weeks)
+            contributionDays.forEach(day => day.color = replace(day.color))
+        }
+      }
+      return {name: `dflag.${color}`, result: true}
     })())
   }
   if (dflags.includes("--error")) {
